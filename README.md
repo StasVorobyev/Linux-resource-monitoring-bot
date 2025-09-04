@@ -102,9 +102,9 @@ chmod +x setup_bot.sh
 ### Если вы не используете systemd-сервис, можно запустить бота вручную:
 
 ```
-source ~/venv/bin/activate
-python ~/bot.py
-deactivate
+source ~/venv/bin/activate # Активируем виртуальное окружение
+pip install paramiko python-telegram-bot # Устанавливаем необходимые библиотеки (если ещё не установлены)
+python ~/bot.py # Запускаем бота
 ```
 
 ---
