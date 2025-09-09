@@ -47,9 +47,9 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-HOME_DIR="/home/$USERNAME"
-VENV_DIR="$HOME_DIR/venv"
-BOT_PATH="$HOME_DIR/bot.py"
+CURRENT_DIR="$(pwd)"
+VENV_DIR="$CURRENT_DIR/venv"
+BOT_PATH="$CURRENT_DIR/bot.py"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 
 echo "Используется пользователь: $USERNAME"
@@ -87,7 +87,7 @@ After=network.target
 
 [Service]
 User =$USERNAME
-WorkingDirectory=$HOME_DIR
+WorkingDirectory=$CURRENT_DIR
 ExecStart=$VENV_DIR/bin/python $BOT_PATH
 Restart=always
 RestartSec=10
