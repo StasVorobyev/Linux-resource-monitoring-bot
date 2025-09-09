@@ -1,17 +1,13 @@
-from creds import token, chat
-from config import start_time, end_time, report_time, MACHINES
+from config import start_time, end_time, report_time, MACHINES, TOKEN, CHAT_ID
+from datetime import datetime, timedelta
+from telegram import Bot
 import paramiko
 import asyncio
-from telegram import Bot
-from datetime import datetime, timedelta
 import json
 import os
 
-TOKEN = token # Токен бота из файла config.py
-CHAT_ID = chat # ChatID из файла config.py
 bot = Bot(token=TOKEN)
 yesterday = datetime.now() - timedelta(days=1)
-
 DATA_FILE = "data.json"
 
 
