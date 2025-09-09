@@ -1,3 +1,9 @@
+# Токен вашего телеграм бота
+TOKEN = "YOUR TOKEN"
+
+# ID вашего чата или группы. В формате "-12345678..."
+CHAT_ID = "-ID"
+
 # Время сбора начальных данных для дневного отчета
 start_time = "00:01"
 
@@ -14,13 +20,13 @@ MACHINES = [
         "host": "1.1.1.1",
         "user": "login",
         "password": None,  # Если используете ключ, пароль можно оставить None
-        "key_filename": "/home/youruser/.ssh/id_rsa"  # Путь к приватному ключу
+        "key_filename": "/home/youruser/.ssh/id_rsa",  # Путь к приватному ключу, можно выставить None если используете логин и пароль
     },
     {
         "name": "Name of your machine (2.2.2.2)",
         "host": "2.2.2.2",
         "user": "login",
         "password": None,  # Если используете ключ, пароль можно оставить None
-        "key_filename": "/home/youruser/.ssh/id_rsa"  # Путь к приватному ключу, можно выставить None если используете логин и пароль
+        "key_filename": "/home/youruser/.ssh/id_rsa",  # Путь к приватному ключу, можно выставить None если используете логин и пароль
     },
 ]

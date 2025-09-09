@@ -64,9 +64,6 @@ def load_data():
     return {}
 
 
-
-
-
 async def get_remote_metrics(host, user, password=None, key_filename=None):
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -203,8 +200,12 @@ async def generate_diff_report():
             try:
                 swap_diff = end_metrics["swap"] - start_metrics["swap"]
                 # Для disk_used, парсить строку, например "10.50GB (50.0%)" -> 10.50
-                start_disk_used_gb = float(start_metrics["disk_used"].split("GB")[0].strip())
-                end_disk_used_gb = float(end_metrics["disk_used"].split("GB")[0].strip())
+                start_disk_used_gb = float(
+                    start_metrics["disk_used"].split("GB")[0].strip()
+                )
+                end_disk_used_gb = float(
+                    end_metrics["disk_used"].split("GB")[0].strip()
+                )
                 disk_diff = end_disk_used_gb - start_disk_used_gb
                 # Для tcp_mem, парсить "used/max (pct%)" -> used
                 start_tcp_used = int(start_metrics["tcp_mem"].split("/")[0].strip())
