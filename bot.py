@@ -10,9 +10,9 @@ import os
 TOKEN = token  # Токен вашего телеграм бота
 CHAT_ID = chat  # ID вашего чата или группы. В формате "-12345678..."
 bot = Bot(token=TOKEN)
+yesterday = datetime.now() - timedelta(days=1)
 
 DATA_FILE = "data.json"
-CONFIG_FILE = "config.json"
 
 
 def get_smiley(value, max_value):
@@ -68,11 +68,7 @@ def load_data():
     return {}
 
 
-def load_config():
-    if os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE, "r") as f:
-            return json.load(f)
-    return {}
+
 
 
 async def get_remote_metrics(host, user, password=None, key_filename=None):
@@ -195,14 +191,11 @@ async def collect_specific_metrics():
 
 
 async def generate_diff_report():
-    config = load_config()
-    start_time = config.get("start_time")
-    end_time = config.get("end_time")
     data = load_data()
     if start_time not in data or end_time not in data:
         return "❌ Недостаточно данных для дневного отчета"
 
-    report = f"📊 Дневной отчет ({end_time} - {start_time}) ({datetime.now().strftime('%H:%M %d.%m.%Y')})\n\n"
+    report = f"📊 Дневной отчет ({yesterday.strftime('%H:%M %d.%m.%Y')})\n\n"
 
     for host in data[start_time]:
         if host in data[end_time]:
@@ -240,10 +233,6 @@ async def generate_diff_report():
 
 
 async def send_report():
-    config = load_config()
-    start_time = config.get("start_time")
-    end_time = config.get("end_time")
-    report_time = config.get("report_time")
     start_hour, start_min = map(int, start_time.split(":"))
     end_hour, end_min = map(int, end_time.split(":"))
     report_hour, report_min = map(int, report_time.split(":"))
