@@ -7,8 +7,8 @@ from datetime import datetime, timedelta
 import json
 import os
 
-TOKEN = token  # Токен вашего телеграм бота
-CHAT_ID = chat  # ID вашего чата или группы. В формате "-12345678..."
+TOKEN = token # Токен бота из файла config.py
+CHAT_ID = chat # ChatID из файла config.py
 bot = Bot(token=TOKEN)
 yesterday = datetime.now() - timedelta(days=1)
 
