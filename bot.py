@@ -128,7 +128,8 @@ async def get_remote_metrics(host, user, password=None, key_filename=None):
 
 
 async def generate_report():
-    report = f"📊 Системный отчет ({datetime.now().strftime('%H:%M %d.%m.%Y')})\n\n"
+    time = datetime.now() + timedelta(hours=3) # Можно указать часовой пояс.
+    report = f"📊 Системный отчет ({time.strftime('%H:%M %d.%m.%Y')})\n\n"
 
     for machine in MACHINES:
         try:
