@@ -51,7 +51,7 @@ def save_data(time_key, metrics_dict):
             data = {}
     data[time_key] = metrics_dict
     with open(DATA_FILE, "w") as f:
-        json.dump(data, f)
+        json.dump(data, f, indent=4)
 
 
 def load_data():
