@@ -1,4 +1,4 @@
-from config import start_time, end_time, report_time, MACHINES, TOKEN, CHAT_ID
+from config import start_time, end_time, report_time, MACHINES, TOKEN, CHAT_ID, TIMEZONE_OFFSET
 from datetime import datetime, timedelta
 from telegram import Bot
 import paramiko
@@ -7,8 +7,13 @@ import json
 import os
 
 bot = Bot(token=TOKEN)
-yesterday = datetime.now() - timedelta(days=1)
+yesterday = (datetime.now() + timedelta(hours=TIMEZONE_OFFSET)) - timedelta(days=1)
 DATA_FILE = "data.json"
+
+# Ensure data.json exists
+if not os.path.exists(DATA_FILE):
+    with open(DATA_FILE, "w") as f:
+        json.dump({}, f)
 
 
 def get_smiley(value, max_value):
@@ -128,7 +133,7 @@ async def get_remote_metrics(host, user, password=None, key_filename=None):
 
 
 async def generate_report():
-    time = datetime.now() + timedelta(hours=3) # Можно указать часовой пояс.
+    time = datetime.now() + timedelta(hours=TIMEZONE_OFFSET)  # Учитываем часовой пояс для отображения.
     report = f"📊 Системный отчет ({time.strftime('%H:%M %d.%m.%Y')})\n\n"
 
     for machine in MACHINES:
