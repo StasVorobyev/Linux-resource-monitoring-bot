@@ -1,19 +1,49 @@
-from config import start_time, end_time, report_time, MACHINES, TOKEN, CHAT_ID, TIMEZONE_OFFSET
+from config import MACHINES, TOKEN, CHAT_ID, TIMEZONE_OFFSET
 from datetime import datetime, timedelta
 from telegram import Bot
 import paramiko
 import asyncio
 import json
 import os
+import subprocess
+
+# Проверка на уже запущенный экземпляр
+result = subprocess.run(['ps', 'aux'], capture_output=True, text=True)
+lines = [line for line in result.stdout.split('\n') if 'python' in line and 'bot.py' in line and 'grep' not in line]
+if len(lines) > 1:
+    print("Bot already running")
+    exit(1)
 
 bot = Bot(token=TOKEN)
-yesterday = (datetime.now() + timedelta(hours=TIMEZONE_OFFSET)) - timedelta(days=1)
-DATA_FILE = "data.json"
+PREVIOUS_METRICS_FILE = "data.json"
 
-# Ensure data.json exists
-if not os.path.exists(DATA_FILE):
-    with open(DATA_FILE, "w") as f:
-        json.dump({}, f)
+
+def load_previous_metrics():
+    if os.path.exists(PREVIOUS_METRICS_FILE):
+        try:
+            with open(PREVIOUS_METRICS_FILE, "r") as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            return {}
+    return {}
+
+
+def save_previous_metrics(metrics):
+    # Сохраняем только числовые метрики
+    numerical_keys = ["cpu", "ram", "swap", "disk", "tcp_mem", "cc"]
+    numerical_metrics = {
+        host: (
+            {k: v for k, v in host_metrics.items() if k in numerical_keys}
+            if host_metrics
+            else None
+        )
+        for host, host_metrics in metrics.items()
+    }
+    with open(PREVIOUS_METRICS_FILE, "w") as f:
+        json.dump(numerical_metrics, f, indent=4)
+
+
+previous_full_metrics = load_previous_metrics()
 
 
 def get_smiley(value, max_value):
@@ -44,29 +74,6 @@ def get_smiley(value, max_value):
         return "🟥🟥🟥🟥🟥🟥🟥🟥🟥"
     else:
         return "🟥🟥🟥🟥🟥🟥🟥🟥🟥🟥"
-
-
-def save_data(time_key, metrics_dict):
-    data = {}
-    if os.path.exists(DATA_FILE):
-        try:
-            with open(DATA_FILE, "r") as f:
-                data = json.load(f)
-        except json.JSONDecodeError:
-            data = {}
-    data[time_key] = metrics_dict
-    with open(DATA_FILE, "w") as f:
-        json.dump(data, f, indent=4)
-
-
-def load_data():
-    if os.path.exists(DATA_FILE):
-        try:
-            with open(DATA_FILE, "r") as f:
-                return json.load(f)
-        except json.JSONDecodeError:
-            return {}
-    return {}
 
 
 async def get_remote_metrics(host, user, password=None, key_filename=None):
@@ -132,113 +139,72 @@ async def get_remote_metrics(host, user, password=None, key_filename=None):
     }
 
 
-async def generate_report():
-    time = datetime.now() + timedelta(hours=TIMEZONE_OFFSET)  # Учитываем часовой пояс для отображения.
+async def generate_report_with_diff(current_metrics, previous_metrics):
+    time = datetime.now() + timedelta(hours=TIMEZONE_OFFSET)
     report = f"📊 Системный отчет ({time.strftime('%H:%M %d.%m.%Y')})\n\n"
 
     for machine in MACHINES:
-        try:
-            metrics = await get_remote_metrics(
-                machine["host"],
-                machine["user"],
-                password=machine.get("password"),
-                key_filename=machine.get("key_filename"),
-            )
+        host = machine["host"]
+        if host in current_metrics and current_metrics[host] is not None:
+            metrics = current_metrics[host]
+            diffs = {}
+            if host in previous_metrics and previous_metrics[host] is not None:
+                prev = previous_metrics[host]
+                diffs["cpu"] = metrics["cpu"] - prev["cpu"]
+                diffs["ram"] = metrics["ram"] - prev["ram"]
+                diffs["swap"] = metrics["swap"] - prev["swap"]
+                # For disk, parse GB
+                curr_disk_gb = float(metrics["disk"].split("GB")[0].strip())
+                prev_disk_gb = float(prev["disk"].split("GB")[0].strip())
+                diffs["disk"] = curr_disk_gb - prev_disk_gb
+                # For tcp_mem, parse used
+                curr_tcp_used = int(metrics["tcp_mem"].split("/")[0].strip())
+                prev_tcp_used = int(prev["tcp_mem"].split("/")[0].strip())
+                diffs["tcp_mem"] = curr_tcp_used - prev_tcp_used
+                diffs["cc"] = metrics["cc"] - prev["cc"]
+            else:
+                diffs = {k: 0 for k in ["cpu", "ram", "swap", "disk", "tcp_mem", "cc"]}
+
+            def format_diff(key, value, unit):
+                diff = diffs[key]
+                sign = "+" if diff >= 0 else ""
+                if key in ["cpu", "ram", "swap"]:
+                    return f"{value} ({sign}{diff:.1f}{unit})"
+                elif key == "disk":
+                    return f"{value} ({sign}{diff:.2f}{unit})"
+                else:
+                    return f"{value} ({sign}{int(diff)})"
+
+            cpu_value = f"{metrics['cpu']:.1f}%"
+            ram_value = f"{metrics['ram']:.1f}%"
+            swap_value = f"{metrics['swap']:.1f}%"
+
             report += (
                 f"🖥 {machine['name']}:\n"
                 f"\n"
-                f"  CC: {metrics['cc']}\n"
+                f"  CC: {format_diff('cc', metrics['cc'], '')}\n"
                 f"\n"
-                f"  CPU: {metrics['cpu']:.1f}%\n"
+                f"  CPU: {format_diff('cpu', cpu_value, '%')}\n"
                 f"  {metrics['cpu_smiley']}\n"
-                f"  RAM: {metrics['ram']:.1f}%\n"
+                f"  RAM: {format_diff('ram', ram_value, '%')}\n"
                 f"  {metrics['ram_smiley']}\n"
-                f"  Swap: {metrics['swap']:.1f}%\n"
+                f"  Swap: {format_diff('swap', swap_value, '%')}\n"
                 f"  {metrics['swap_smiley']}\n"
-                f"  Disk Used: {metrics['disk']}\n"
+                f"  Disk Used: {format_diff('disk', metrics['disk'], 'GB')}\n"
                 f"  {metrics['disk_smiley']}\n"
-                f"  TCP Mem: {metrics['tcp_mem']}\n"
+                f"  TCP Mem: {format_diff('tcp_mem', metrics['tcp_mem'], '')}\n"
                 f"  {metrics['tcp_mem_smiley']}\n"
                 f"\n"
                 f"————————————————————\n\n"
             )
-        except Exception as e:
-            report += f"❌ {machine['name']}: ошибка подключения - {str(e)}\n\n"
-
-    return report
-
-
-async def collect_specific_metrics():
-    metrics_dict = {}
-    for machine in MACHINES:
-        try:
-            metrics = await get_remote_metrics(
-                machine["host"],
-                machine["user"],
-                password=machine.get("password"),
-                key_filename=machine.get("key_filename"),
-            )
-            metrics_dict[machine["host"]] = {
-                "name": machine["name"],
-                "swap": metrics["swap"],
-                "disk_used": metrics["disk"],
-                "tcp_mem": metrics["tcp_mem"],
-            }
-        except Exception as e:
-            metrics_dict[machine["host"]] = {"name": machine["name"], "error": str(e)}
-    return metrics_dict
-
-
-async def generate_diff_report():
-    data = load_data()
-    if start_time not in data or end_time not in data:
-        return "❌ Недостаточно данных для дневного отчета"
-
-    report = f"📊 Дневной отчет ({yesterday.strftime('%H:%M %d.%m.%Y')})\n\n"
-
-    for host in data[start_time]:
-        if host in data[end_time]:
-            start_metrics = data[start_time][host]
-            end_metrics = data[end_time][host]
-            if "error" in start_metrics or "error" in end_metrics:
-                report += f"❌ {start_metrics['name']}: ошибка в данных\n\n"
-                continue
-            try:
-                swap_diff = end_metrics["swap"] - start_metrics["swap"]
-                # Для disk_used, парсить строку, например "10.50GB (50.0%)" -> 10.50
-                start_disk_used_gb = float(
-                    start_metrics["disk_used"].split("GB")[0].strip()
-                )
-                end_disk_used_gb = float(
-                    end_metrics["disk_used"].split("GB")[0].strip()
-                )
-                disk_diff = end_disk_used_gb - start_disk_used_gb
-                # Для tcp_mem, парсить "used/max (pct%)" -> used
-                start_tcp_used = int(start_metrics["tcp_mem"].split("/")[0].strip())
-                end_tcp_used = int(end_metrics["tcp_mem"].split("/")[0].strip())
-                tcp_diff = end_tcp_used - start_tcp_used
-
-                report += (
-                    f"🖥 {start_metrics['name']}:\n"
-                    f"  Swap diff: {swap_diff:.1f}%\n"
-                    f"  Disk Used diff: {disk_diff:.2f}GB\n"
-                    f"  TCP Mem diff: {tcp_diff}\n"
-                    f"\n"
-                    f"————————————————————\n\n"
-                )
-            except Exception as e:
-                report += f"❌ {start_metrics['name']}: ошибка расчета - {str(e)}\n\n"
         else:
-            name = data[start_time][host].get("name", host)
-            report += f"❌ {name}: отсутствуют данные для {end_time}\n\n"
+            report += f"❌ {machine['name']}: ошибка подключения\n\n"
 
     return report
 
 
 async def send_report():
-    start_hour, start_min = map(int, start_time.split(":"))
-    end_hour, end_min = map(int, end_time.split(":"))
-    report_hour, report_min = map(int, report_time.split(":"))
+    global previous_full_metrics
 
     while True:
         now = datetime.now()
@@ -251,21 +217,31 @@ async def send_report():
         now = datetime.now()
         try:
             if now.minute == 0:
-                # Отправить полный отчет каждый час
-                report = await generate_report()
+                # Собрать текущие метрики
+                current_full_metrics = {}
+                for machine in MACHINES:
+                    try:
+                        metrics = await get_remote_metrics(
+                            machine["host"],
+                            machine["user"],
+                            password=machine.get("password"),
+                            key_filename=machine.get("key_filename"),
+                        )
+                        current_full_metrics[machine["host"]] = metrics
+                    except Exception as e:
+                        current_full_metrics[machine["host"]] = None
+                        print(f"Ошибка подключения к {machine['name']}: {e}")
+
+                # Генерировать отчет с разницей
+                report = await generate_report_with_diff(
+                    current_full_metrics, previous_full_metrics
+                )
                 await bot.send_message(chat_id=CHAT_ID, text=report)
-            elif now.hour == start_hour and now.minute == start_min:
-                # Собрать и сохранить данные в start_time
-                metrics = await collect_specific_metrics()
-                save_data(start_time, metrics)
-            elif now.hour == end_hour and now.minute == end_min:
-                # Собрать и сохранить данные в end_time
-                metrics = await collect_specific_metrics()
-                save_data(end_time, metrics)
-            elif now.hour == report_hour and now.minute == report_min:
-                # Отправить дневной отчет с разницей
-                report = await generate_diff_report()
-                await bot.send_message(chat_id=CHAT_ID, text=report)
+
+                # Обновить предыдущие метрики
+                previous_full_metrics = current_full_metrics
+                save_previous_metrics(previous_full_metrics)
+
         except Exception as e:
             print(f"Ошибка: {e}")
 
