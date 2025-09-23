@@ -9,7 +9,7 @@
 Бот подключается по SSH к заданным машинам, собирает метрики CPU, RAM, Swap, Используемое место на диске, Использование TCP памяти и количество соединений (concurrent connections), формирует отчёт с указанием разницы по сравнению с предыдущим часом и отправляет его в указанный Telegram-чат каждый час. Предыдущие метрики сохраняются в файл data.json для корректного расчета разниц после перезапуска бота.
 
 <div align="center">
-<img width="338" height="657" alt="image" src="https://github.com/user-attachments/assets/ba73a397-3c45-4eee-8a83-a337ab74069a" />
+<img width="335" height="654" alt="image" src="https://github.com/user-attachments/assets/6ba89750-fb49-4340-9d1b-dee1af036dec" />
 </div>
 
 ---
